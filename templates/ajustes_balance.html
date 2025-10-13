@@ -1,0 +1,121 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h4 class="mb-0"><i class="bi bi-sliders me-2"></i>Ajustes de Balance de Horas</h4>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">
+            Esta es una herramienta de administrador para realizar ajustes manuales a la bolsa de horas de los empleados. 
+            Úsala para liquidar horas extra, registrar adelantos o aplicar bonificaciones.
+        </p>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead>
+                    <tr>
+                        <th>Empleado</th>
+                        <th class="text-center">Balance Actual</th>
+                        <th style="width: 150px;">Ajuste (+/-)</th>
+                        <th style="width: 200px;">Tipo de Ajuste</th>
+                        <th class="text-end">Acción</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for empleado in empleados %}
+                    <tr id="fila-empleado-{{ empleado.id_empleado }}">
+                        <td>{{ empleado.nombre }}</td>
+                        <td class="text-center">
+                            <span class="badge fs-6 {% if empleado.balance_horas >= 0 %}bg-success{% else %}bg-danger{% endif %}" id="balance-actual-{{ empleado.id_empleado }}">
+                                {{ "%.2f"|format(empleado.balance_horas) }} h
+                            </span>
+                        </td>
+                        <td>
+                            <input type="number" step="0.01" class="form-control form-control-sm" id="ajuste-valor-{{ empleado.id_empleado }}">
+                        </td>
+                        <td>
+                             <select class="form-select form-select-sm" id="ajuste-tipo-{{ empleado.id_empleado }}">
+                                <option value="sumar">Sumar (Bono)</option>
+                                <option value="restar">Restar (Adelanto)</option>
+                                <option value="establecer">Establecer Nuevo Saldo</option>
+                            </select>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-primary btn-sm btn-guardar-ajuste" data-id="{{ empleado.id_empleado }}">
+                                Aplicar Ajuste
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const botonesGuardar = document.querySelectorAll('.btn-guardar-ajuste');
+
+    botonesGuardar.forEach(boton => {
+        boton.addEventListener('click', async function() {
+            const empleadoId = this.dataset.id;
+            const valorInput = document.getElementById(`ajuste-valor-${empleadoId}`);
+            const tipoSelect = document.getElementById(`ajuste-tipo-${empleadoId}`);
+            const balanceActualSpan = document.getElementById(`balance-actual-${empleadoId}`);
+
+            const cantidad = parseFloat(valorInput.value);
+            const tipo = tipoSelect.value;
+
+            if (isNaN(cantidad)) {
+                alert('Por favor, introduce un número válido.');
+                return;
+            }
+
+            // ===== NUEVA ALERTA DE CONFIRMACIÓN AQUÍ =====
+            const confirmacion = confirm("¿Estás seguro de que quieres aplicar este ajuste? Esta acción es manual y no se puede deshacer automáticamente.");
+            
+            if (!confirmacion) {
+                // Si el usuario hace clic en "Cancelar", no hacemos nada.
+                return;
+            }
+            // ===============================================
+
+            this.disabled = true;
+            this.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+
+            try {
+                const response = await fetch('/api/ajustar_balance', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        empleado_id: empleadoId,
+                        cantidad: cantidad,
+                        tipo: tipo
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Error en el servidor');
+                }
+
+                const nuevoBalance = parseFloat(data.nuevo_balance);
+                balanceActualSpan.textContent = `${nuevoBalance.toFixed(2)} h`;
+                balanceActualSpan.className = `badge fs-6 ${nuevoBalance >= 0 ? 'bg-success' : 'bg-danger'}`;
+                valorInput.value = '';
+
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            } finally {
+                this.disabled = false;
+                this.innerHTML = 'Aplicar Ajuste';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

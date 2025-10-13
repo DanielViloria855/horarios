@@ -1,0 +1,214 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row">
+
+    <div class="col-md-5">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-dark text-white">
+                <h4 class="mb-0">🕒 Registrar Nuevo Turno</h4>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('nuevo_turno') }}" method="POST">
+                    <div class="mb-3">
+                        <label for="id_empleado" class="form-label">Empleado:</label>
+                        <select name="id_empleado" id="id_empleado" class="form-select" required>
+                            <option value="" disabled selected>-- Selecciona un empleado --</option>
+                            {% for empleado in empleados %}
+                                <option value="{{ empleado.id_empleado }}">{{ empleado.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fecha" class="form-label">Fecha del Turno:</label>
+                        <input type="date" name="fecha" id="fecha" class="form-control" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="hora_entrada" class="form-label">Hora de Entrada:</label>
+                            <input type="time" name="hora_entrada" id="hora_entrada" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="hora_salida" class="form-label">Hora de Salida:</label>
+                            <input type="time" name="hora_salida" id="hora_salida" class="form-control" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Guardar Turno</button>
+                </form>
+
+                <div id="bolsaDeHoras" class="alert alert-info mt-4" style="display: none;">
+                    <h5>Bolsa de Horas</h5>
+                    <p class="mb-2">
+                        Este empleado tiene un balance de <strong id="balanceValor">0.0</strong> horas.
+                    </p>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="usar_balance" id="usarBalanceCheck">
+                        <label class="form-check-label" for="usarBalanceCheck">
+                            Compensar este turno con horas del banco.
+                        </label>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h4 class="mb-0">🗓️ Consultar Horarios</h4>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('nuevo_turno') }}" method="GET" class="border p-3 rounded bg-light mb-4">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-md-3">
+                            <label for="fecha_inicio" class="form-label">Desde:</label>
+                            <input type="date" name="fecha_inicio" class="form-control" value="{{ filtros.get('fecha_inicio', '') }}">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="fecha_fin" class="form-label">Hasta:</label>
+                            <input type="date" name="fecha_fin" class="form-control" value="{{ filtros.get('fecha_fin', '') }}">
+                        </div>
+                        <div class="col-md-4">
+                            <label for="id_empleado_filtro" class="form-label">Empleado:</label>
+                            <select name="id_empleado" id="id_empleado_filtro" class="form-select">
+                                <option value="">-- Todos los empleados --</option>
+                                {% for emp in todos_los_empleados %}
+                                <option value="{{ emp.id_empleado }}" {% if filtros.get('id_empleado') == emp.id_empleado|string %}selected{% endif %}>
+                                    {{ emp.nombre }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-secondary w-100" type="submit">Filtrar</button>
+                        </div>
+                    </div>
+                </form>
+
+                {% if turnos_detallados %}
+                    <h5>Resumen del Período</h5>
+                    <table class="table table-bordered table-sm text-center mb-4">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Horas Normales</th>
+                                <th>Horas Nocturnas</th>
+                                <th>Horas Extra (aprox.)</th>
+                                <th>TOTAL HORAS</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ "%.2f"|format(resumen_periodo.normales) }}</td>
+                                <td>{{ "%.2f"|format(resumen_periodo.nocturnas) }}</td>
+                                <td>{{ "%.2f"|format(resumen_periodo.extras) }}</td>
+                                <td><strong>{{ "%.2f"|format(resumen_periodo.total) }}</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h5>Detalle de Turnos</h5>
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-striped table-hover table-sm">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Fecha</th>
+                                    <th>Empleado</th>
+                                    <th>Entrada</th>
+                                    <th>Salida</th>
+                                    <th>Total Turno</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for turno in turnos_detallados %}
+                                <tr>
+                                    <td>{{ turno.fecha.strftime('%d/%m/%Y') }}</td>
+                                    <td>{{ turno.empleado }}</td>
+                                    <td>{{ turno.entrada.strftime('%I:%M %p') }}</td>
+                                    <td>{{ turno.salida.strftime('%I:%M %p') }}</td>
+                                    <td><strong>{{ "%.2f"|format(turno.total) }} h</strong></td>
+                                    <td>
+                                        <a href="{{ url_for('editar_turno', id=turno.id) }}" class="btn btn-warning btn-sm py-0">Editar</a>
+                                        <form action="{{ url_for('eliminar_turno', id=turno.id) }}" method="POST" style="display: inline-block;" onsubmit="return confirm('¿Estás seguro de que quieres eliminar este turno?');">
+                                            <button type="submit" class="btn btn-danger btn-sm py-0">Eliminar</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% elif filtros.get('fecha_inicio') %}
+                    <div class="alert alert-info text-center">No se encontraron turnos con los filtros seleccionados.</div>
+                {% else %}
+                    <div class="alert alert-light text-center">Usa los filtros para buscar turnos.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selectorEmpleado = document.getElementById('id_empleado');
+    const cuadroBolsaHoras = document.getElementById('bolsaDeHoras');
+    const textoBalance = document.getElementById('balanceValor');
+    const horaEntrada = document.getElementById('hora_entrada');
+    const horaSalida = document.getElementById('hora_salida');
+
+    // 1. Cuando se selecciona un empleado, buscamos su balance
+    selectorEmpleado.addEventListener('change', function() {
+        const empleadoId = this.value;
+        if (!empleadoId) {
+            cuadroBolsaHoras.style.display = 'none';
+            return;
+        }
+
+        fetch(`/api/empleado/${empleadoId}/balance`)
+            .then(response => response.json())
+            .then(data => {
+                const balance = parseFloat(data.balance).toFixed(2);
+                textoBalance.textContent = balance;
+                // Verificamos si hay que mostrar el cuadro
+                verificarDuracionTurno();
+            })
+            .catch(error => console.error('Error al obtener balance:', error));
+    });
+
+    // 2. Función para decidir si mostrar el cuadro de compensación
+    function verificarDuracionTurno() {
+        // Solo continuamos si hay un empleado seleccionado y las horas están llenas
+        if (!selectorEmpleado.value || !horaEntrada.value || !horaSalida.value) {
+            cuadroBolsaHoras.style.display = 'none';
+            return;
+        }
+        
+        const balanceActual = parseFloat(textoBalance.textContent);
+        if (balanceActual <= 0) {
+            cuadroBolsaHoras.style.display = 'none';
+            return;
+        }
+
+        // Calculamos la duración del turno en horas
+        const entrada = new Date(`1970-01-01T${horaEntrada.value}`);
+        let salida = new Date(`1970-01-01T${horaSalida.value}`);
+        if (salida < entrada) {
+            salida.setDate(salida.getDate() + 1);
+        }
+        const duracionHoras = (salida - entrada) / 1000 / 3600;
+
+        // Si el turno dura menos de 6 horas Y el empleado tiene balance positivo, mostramos la opción
+        if (duracionHoras > 0 && duracionHoras < 6) {
+            cuadroBolsaHoras.style.display = 'block';
+        } else {
+            cuadroBolsaHoras.style.display = 'none';
+        }
+    }
+
+    // 3. Escuchamos cambios en las horas para re-evaluar si se muestra el cuadro
+    horaEntrada.addEventListener('input', verificarDuracionTurno);
+    horaSalida.addEventListener('input', verificarDuracionTurno);
+});
+</script>
+{% endblock %}

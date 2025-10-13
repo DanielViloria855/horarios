@@ -1,0 +1,807 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header text-white" style="background: linear-gradient(135deg, #E30613 0%, #C4B49F 100%);">
+            <div class="d-flex justify-content-between align-items-center">
+                <h4 class="mb-0"><i class="bi bi-bar-chart-fill me-2"></i>Dashboard de Gráficos y Estadísticas</h4>
+                <button class="btn btn-light btn-sm" onclick="exportarDashboard()">
+                    <i class="bi bi-download me-1"></i>Exportar Reporte
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtros -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-funnel me-2"></i>Filtros y Configuración</h5>
+        </div>
+        <div class="card-body">
+            <form id="filtrosForm" class="row g-3">
+                <div class="col-md-3">
+                    <label for="tipo_periodo" class="form-label">Tipo de Período:</label>
+                    <select id="tipo_periodo" name="tipo_periodo" class="form-select" required>
+                        <option value="mensual">Mensual</option>
+                        <option value="quincenal">Quincenal</option>
+                        <option value="semanal">Semanal</option>
+                        <option value="personalizado">Personalizado</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="mes" class="form-label">Mes:</label>
+                    <select id="mes" name="mes" class="form-select" required>
+                        {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if i == now.month %}selected{% endif %}>
+                            {{ ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][i-1] }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2">
+                    <label for="anio" class="form-label">Año:</label>
+                    <select id="anio" name="anio" class="form-select" required>
+                        {% for year in years %}
+                        <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-2" id="quincenaField" style="display: none;">
+                    <label for="quincena" class="form-label">Quincena:</label>
+                    <select id="quincena" name="quincena" class="form-select">
+                        <option value="1">Primera (1-15)</option>
+                        <option value="2">Segunda (16-Fin)</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-2" id="semanaField" style="display: none;">
+                    <label for="semana" class="form-label">Semana:</label>
+                    <select id="semana" name="semana" class="form-select">
+                        <option value="1">Semana 1</option>
+                        <option value="2">Semana 2</option>
+                        <option value="3">Semana 3</option>
+                        <option value="4">Semana 4</option>
+                        <option value="5">Semana 5</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-4" id="personalizadoField" style="display: none;">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <label for="fecha_inicio" class="form-label">Fecha Inicio:</label>
+                            <input type="date" id="fecha_inicio" name="fecha_inicio" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="fecha_fin" class="form-label">Fecha Fin:</label>
+                            <input type="date" id="fecha_fin" name="fecha_fin" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="id_empleado" class="form-label">Empleado Específico:</label>
+                    <select name="id_empleado" id="id_empleado" class="form-select">
+                        <option value="">-- Todos los empleados --</option>
+                        {% for emp in empleados %}
+                        <option value="{{ emp.id_empleado }}">{{ emp.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="cargo" class="form-label">Filtrar por Cargo:</label>
+                    <select name="cargo" id="cargo" class="form-select">
+                        <option value="">-- Todos los cargos --</option>
+                        {% for cargo in cargos %}
+                        <option value="{{ cargo }}">{{ cargo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="tipo_grafico" class="form-label">Tipo de Gráfico Principal:</label>
+                    <select name="tipo_grafico" id="tipo_grafico" class="form-select">
+                        <option value="barras">Barras</option>
+                        <option value="pastel">Pastel</option>
+                        <option value="lineas">Líneas</option>
+                        <option value="radar">Radar</option>
+                    </select>
+                </div>
+                
+                <div class="col-md-3">
+                    <label for="tipo_datos" class="form-label">Tipo de Datos:</label>
+                    <select name="tipo_datos" id="tipo_datos" class="form-select">
+                        <option value="totales">Horas Totales</option>
+                        <option value="nocturnas">Horas Nocturnas</option>
+                        <option value="diurnas">Horas Diurnas</option>
+                        <option value="extras">Horas Extras</option>
+                    </select>
+                </div>
+                
+                <div class="col-12">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="mostrar_comparativa" checked>
+                        <label class="form-check-label" for="mostrar_comparativa">
+                            Mostrar comparativa entre empleados
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="col-12">
+                    <button type="button" class="btn btn-primary" onclick="cargarGraficos()">
+                        <i class="bi bi-arrow-repeat me-1"></i>Actualizar Gráficos
+                    </button>
+                    <button type="reset" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-clockwise me-1"></i>Restablecer
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Resumen Estadístico -->
+    <div class="row mb-4" id="resumenEstadistico" style="display: none;">
+        <!-- Se llenará dinámicamente -->
+    </div>
+
+    <!-- Gráficos Principales -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card shadow-sm h-100">
+                <div class="btn-group btn-group-sm">
+            <button class="btn btn-outline-secondary active" onclick="cambiarVista('barras', this)">Barras</button>
+            <button class="btn btn-outline-secondary" onclick="cambiarVista('pastel', this)">Pastel</button>
+            <button class="btn btn-outline-secondary" onclick="cambiarVista('lineas', this)">Líneas</button>
+            </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoPrincipal" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Top 5 - Horas Nocturnas</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoTopNocturnas" height="300"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Segunda Fila de Gráficos -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-people me-2"></i>Horas por Cargo</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoPorCargo" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-calendar-week me-2"></i>Evolución Semanal</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoEvolucion" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tercera Fila - Gráficos Especializados -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-moon me-2"></i>Ratio Nocturno/Diumno</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoRatio" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Promedio Horas por Día</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoPromedio" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Tendencia Mensual</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="graficoTendencia" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabla de Datos Detallados -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="bi bi-table me-2"></i>Datos Detallados</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover" id="tablaDetalles">
+                    <thead>
+                        <tr>
+                            <th>Empleado</th>
+                            <th>Cargo</th>
+                            <th>Horas Totales</th>
+                            <th>Horas Diurnas</th>
+                            <th>Horas Nocturnas</th>
+                            <th>H.N. Dominical</th>
+                            <th>Promedio/Día</th>
+                            <th>% Nocturno</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cuerpoTabla">
+                        <!-- Se llenará dinámicamente -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Spinner -->
+<div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center">
+                <div class="spinner-border text-primary mb-3" role="status">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <p class="mb-0">Generando gráficos...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: none;
+    border-radius: 10px;
+}
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+}
+.stats-card {
+    transition: transform 0.2s;
+}
+.stats-card:hover {
+    transform: translateY(-2px);
+}
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+</style>
+
+<script>
+// Configuración de colores
+const colores = {
+    primario: '#E30613',
+    secundario: '#C4B49F',
+    diurnas: '#4CAF50',
+    nocturnas: '#2196F3',
+    nocturnasDom: '#9C27B0',
+    extras: '#FF9800',
+    fondos: [
+        'rgba(227, 6, 19, 0.7)',
+        'rgba(196, 180, 159, 0.7)',
+        'rgba(76, 175, 80, 0.7)',
+        'rgba(33, 150, 243, 0.7)',
+        'rgba(156, 39, 176, 0.7)',
+        'rgba(255, 152, 0, 0.7)',
+        'rgba(233, 30, 99, 0.7)',
+        'rgba(0, 150, 136, 0.7)'
+    ],
+    bordes: [
+        'rgba(227, 6, 19, 1)',
+        'rgba(196, 180, 159, 1)',
+        'rgba(76, 175, 80, 1)',
+        'rgba(33, 150, 243, 1)',
+        'rgba(156, 39, 176, 1)',
+        'rgba(255, 152, 0, 1)',
+        'rgba(233, 30, 99, 1)',
+        'rgba(0, 150, 136, 1)'
+    ]
+};
+
+// Mapeo de tipos de gráficos (ESPAÑOL -> INGLÉS)
+const chartTypeMap = {
+    'barras': 'bar',
+    'pastel': 'doughnut',
+    'lineas': 'line',
+    'radar': 'radar'
+};
+
+// Variables globales para los gráficos
+let graficos = {};
+let datosActuales = {};
+let vistaActual = 'bar'; // Iniciar con tipo en inglés
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', function() {
+    configurarFiltros();
+    cargarGraficos();
+});
+
+// Configurar comportamiento de filtros
+function configurarFiltros() {
+    const tipoPeriodo = document.getElementById('tipo_periodo');
+    tipoPeriodo.addEventListener('change', function() {
+        document.getElementById('quincenaField').style.display = 'none';
+        document.getElementById('semanaField').style.display = 'none';
+        document.getElementById('personalizadoField').style.display = 'none';
+        
+        if (this.value === 'quincenal') {
+            document.getElementById('quincenaField').style.display = 'block';
+        } else if (this.value === 'semanal') {
+            document.getElementById('semanaField').style.display = 'block';
+        } else if (this.value === 'personalizado') {
+            document.getElementById('personalizadoField').style.display = 'block';
+        }
+    });
+    
+    // Establecer fechas por defecto para personalizado
+    const hoy = new Date();
+    const haceUnMes = new Date(hoy.getFullYear(), hoy.getMonth() - 1, hoy.getDate());
+    document.getElementById('fecha_inicio').value = haceUnMes.toISOString().split('T')[0];
+    document.getElementById('fecha_fin').value = hoy.toISOString().split('T')[0];
+}
+
+// Cambiar vista de gráfico principal CORREGIDO
+function cambiarVista(tipoEsp, btnElem) {
+    const tipoChart = chartTypeMap[tipoEsp] || tipoEsp;
+    vistaActual = tipoChart;
+    const btnGroup = btnElem.closest('.btn-group');
+    if (btnGroup) btnGroup.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    btnElem.classList.add('active');
+    actualizarGraficoPrincipal();
+}
+
+// Función principal para cargar gráficos CON VALIDACIONES
+function cargarGraficos() {
+    mostrarLoading(true);
+    
+    const formData = new FormData(document.getElementById('filtrosForm'));
+    const params = new URLSearchParams(formData);
+    
+    fetch(`/api/graficos/datos?${params}`)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('RESP FROM API:', data); // Debug
+            
+            if (!data) {
+                throw new Error('No se recibieron datos del servidor');
+            }
+            
+            datosActuales = data;
+            
+            // Validaciones defensivas antes de crear gráficos
+            if (data.estadisticas) {
+                crearResumenEstadistico(data.estadisticas);
+            } else {
+                console.error('estadisticas undefined', data);
+                crearResumenEstadistico({
+                    totalHoras: 0,
+                    horasDiurnas: 0,
+                    horasNocturnas: 0,
+                    horasNocturnasDom: 0,
+                    totalEmpleados: 0,
+                    promedioPorEmpleado: 0
+                });
+            }
+            
+            if (data.graficoPrincipal) crearGraficoPrincipal(data.graficoPrincipal);
+            if (data.topNocturnas) crearGraficoTopNocturnas(data.topNocturnas);
+            if (data.porCargo) crearGraficoPorCargo(data.porCargo);
+            if (data.evolucion) crearGraficoEvolucion(data.evolucion);
+            if (data.ratio) crearGraficoRatio(data.ratio);
+            if (data.promedio) crearGraficoPromedio(data.promedio);
+            if (data.tendencia) crearGraficoTendencia(data.tendencia);
+            if (data.detalles) llenarTablaDetalles(data.detalles);
+            
+            mostrarLoading(false);
+        })
+        .catch(error => {
+            console.error('Error completo:', error);
+            mostrarLoading(false);
+            alert('Error al cargar los datos: ' + error.message);
+        });
+}
+
+// Mostrar/ocultar loading
+function mostrarLoading(mostrar) {
+    const modal = new bootstrap.Modal(document.getElementById('loadingModal'));
+    if (mostrar) {
+        modal.show();
+    } else {
+        modal.hide();
+    }
+}
+
+// Crear resumen estadístico CON VALIDACIÓN
+function crearResumenEstadistico(estadisticas) {
+    if (!estadisticas) {
+        console.error('estadisticas es undefined');
+        return;
+    }
+    
+    const container = document.getElementById('resumenEstadistico');
+    container.innerHTML = '';
+    container.style.display = 'flex';
+    
+    // Asegurar que todos los valores existan
+    const stats = {
+        totalHoras: estadisticas.totalHoras || 0,
+        horasDiurnas: estadisticas.horasDiurnas || 0,
+        horasNocturnas: estadisticas.horasNocturnas || 0,
+        horasNocturnasDom: estadisticas.horasNocturnasDom || 0,
+        totalEmpleados: estadisticas.totalEmpleados || 0,
+        promedioPorEmpleado: estadisticas.promedioPorEmpleado || 0
+    };
+    
+    const metrics = [
+        { icon: 'bi-clock', label: 'Total Horas', value: stats.totalHoras, color: 'primary' },
+        { icon: 'bi-sun', label: 'Horas Diurnas', value: stats.horasDiurnas, color: 'success' },
+        { icon: 'bi-moon', label: 'Horas Nocturnas', value: stats.horasNocturnas, color: 'info' },
+        { icon: 'bi-calendar-event', label: 'H.N. Dominical', value: stats.horasNocturnasDom, color: 'warning' },
+        { icon: 'bi-person', label: 'Empleados Activos', value: stats.totalEmpleados, color: 'secondary' },
+        { icon: 'bi-graph-up', label: 'Promedio x Empleado', value: stats.promedioPorEmpleado, color: 'dark' }
+    ];
+    
+    metrics.forEach(metric => {
+        const col = document.createElement('div');
+        col.className = 'col-md-2';
+        col.innerHTML = `
+            <div class="card stats-card border-${metric.color} h-100">
+                <div class="card-body text-center">
+                    <i class="bi ${metric.icon} text-${metric.color} display-6"></i>
+                    <h3 class="mt-2 text-${metric.color}">${metric.value}</h3>
+                    <p class="text-muted mb-0">${metric.label}</p>
+                </div>
+            </div>
+        `;
+        container.appendChild(col);
+    });
+}
+
+// Destruir gráfico existente
+function destruirGrafico(id) {
+    if (graficos[id]) {
+        graficos[id].destroy();
+        graficos[id] = null;
+    }
+}
+
+// Gráfico principal USANDO TIPOS EN INGLÉS
+function crearGraficoPrincipal(datos) {
+    destruirGrafico('principal');
+    
+    const ctx = document.getElementById('graficoPrincipal').getContext('2d');
+    const config = {
+        type: vistaActual, // Ahora usa el tipo mapeado (bar, doughnut, line)
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Horas Diurnas',
+                data: datos.diurnas,
+                backgroundColor: colores.diurnas,
+                borderColor: colores.diurnas,
+                borderWidth: 2
+            }, {
+                label: 'Horas Nocturnas',
+                data: datos.nocturnas,
+                backgroundColor: colores.nocturnas,
+                borderColor: colores.nocturnas,
+                borderWidth: 2
+            }, {
+                label: 'H.N. Dominical',
+                data: datos.nocturnasDom,
+                backgroundColor: colores.nocturnasDom,
+                borderColor: colores.nocturnasDom,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Distribución de Horas por Empleado'
+                },
+                legend: {
+                    position: 'top',
+                }
+            },
+            scales: vistaActual === 'bar' ? {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Horas'
+                    }
+                }
+            } : {}
+        }
+    };
+    
+    graficos.principal = new Chart(ctx, config);
+}
+
+function actualizarGraficoPrincipal() {
+    if (datosActuales.graficoPrincipal) {
+        crearGraficoPrincipal(datosActuales.graficoPrincipal);
+    }
+}
+
+// Gráfico top 5 nocturnas
+function crearGraficoTopNocturnas(datos) {
+    destruirGrafico('topNocturnas');
+    
+    const ctx = document.getElementById('graficoTopNocturnas').getContext('2d');
+    graficos.topNocturnas = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                data: datos.data,
+                backgroundColor: colores.fondos.slice(0, datos.data.length),
+                borderColor: colores.bordes.slice(0, datos.data.length),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                title: {
+                    display: true,
+                    text: 'Top 5 - Más Horas Nocturnas'
+                }
+            }
+        }
+    });
+}
+
+// Gráfico por cargo
+function crearGraficoPorCargo(datos) {
+    destruirGrafico('porCargo');
+    
+    const ctx = document.getElementById('graficoPorCargo').getContext('2d');
+    graficos.porCargo = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Horas por Cargo',
+                data: datos.data,
+                backgroundColor: colores.fondos.slice(0, datos.data.length),
+                borderColor: colores.bordes.slice(0, datos.data.length),
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de evolución
+function crearGraficoEvolucion(datos) {
+    destruirGrafico('evolucion');
+    
+    const ctx = document.getElementById('graficoEvolucion').getContext('2d');
+    graficos.evolucion = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Horas Semanales',
+                data: datos.data,
+                borderColor: colores.primario,
+                backgroundColor: colores.primario + '20',
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de ratio
+function crearGraficoRatio(datos) {
+    destruirGrafico('ratio');
+    
+    const ctx = document.getElementById('graficoRatio').getContext('2d');
+    graficos.ratio = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Horas Diurnas', 'Horas Nocturnas'],
+            datasets: [{
+                data: [datos.diurnas, datos.nocturnas],
+                backgroundColor: [colores.diurnas, colores.nocturnas],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de promedio
+function crearGraficoPromedio(datos) {
+    destruirGrafico('promedio');
+    
+    const ctx = document.getElementById('graficoPromedio').getContext('2d');
+    graficos.promedio = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Promedio Horas/Día',
+                data: datos.data,
+                backgroundColor: colores.secundario,
+                borderColor: colores.secundario,
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Gráfico de tendencia
+function crearGraficoTendencia(datos) {
+    destruirGrafico('tendencia');
+    
+    const ctx = document.getElementById('graficoTendencia').getContext('2d');
+    graficos.tendencia = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: datos.labels,
+            datasets: [{
+                label: 'Tendencia Mensual',
+                data: datos.data,
+                borderColor: colores.primario,
+                backgroundColor: 'transparent',
+                borderWidth: 3,
+                pointBackgroundColor: colores.primario,
+                pointRadius: 5
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+// Llenar tabla de detalles
+function llenarTablaDetalles(detalles) {
+    const cuerpo = document.getElementById('cuerpoTabla');
+    cuerpo.innerHTML = '';
+    
+    detalles.forEach(item => {
+        const fila = document.createElement('tr');
+        fila.innerHTML = `
+            <td>${item.empleado}</td>
+            <td>${item.cargo}</td>
+            <td><strong>${item.totalHoras}</strong></td>
+            <td>${item.horasDiurnas}</td>
+            <td>${item.horasNocturnas}</td>
+            <td>${item.horasNocturnasDom}</td>
+            <td>${item.promedioDia}</td>
+            <td><span class="badge ${item.porcentajeNocturno > 30 ? 'bg-warning' : 'bg-info'}">${item.porcentajeNocturno}%</span></td>
+        `;
+        cuerpo.appendChild(fila);
+    });
+}
+
+// Exportar dashboard
+function exportarDashboard() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // Título
+    doc.setFontSize(20);
+    doc.text('Reporte de Gráficos - Dashboard', 20, 20);
+    
+    // Fecha
+    doc.setFontSize(10);
+    doc.text(`Generado: ${new Date().toLocaleDateString()}`, 20, 30);
+    
+    // Aquí podrías añadir la exportación de los gráficos como imágenes
+    // Esto es más complejo y requeriría librerías adicionales
+    
+    doc.save('dashboard_graficos.pdf');
+}
+</script>
+
+<!-- Incluir Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Incluir jsPDF para exportación -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+{% endblock %}

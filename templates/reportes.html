@@ -1,0 +1,367 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header text-white" style="background: linear-gradient(135deg, #E30613 0%, #C4B49F 100%);">
+        <h4 class="mb-0"><i class="bi bi-file-earmark-text me-2"></i>Generador de Reportes</h4>
+    </div>
+    <div class="card-body">
+        <form action="/reportes/generar" method="POST" id="reportForm">
+            <div class="border p-3 rounded mb-4" style="background-color: #fefaf0;">
+                <h5 class="mb-3"><i class="bi bi-calendar-range me-2"></i>1. Selecciona el Período</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label for="tipo_periodo" class="form-label">Tipo de Reporte:</label>
+                        <select id="tipo_periodo" name="tipo_periodo" class="form-select" required onchange="togglePeriodFields()">
+                            <option value="semanal">Semanal</option>
+                            <option value="quincenal" selected>Quincenal</option>
+                            <option value="mensual">Mensual</option>
+                            <option value="personalizado">Personalizado</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="mes" class="form-label">Mes:</label>
+                        <select id="mes" name="mes" class="form-select" required>
+                            {% for i in range(1, 13) %}
+                            <option value="{{ i }}" {% if i == now.month %}selected{% endif %}>{{ ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][i-1] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="anio" class="form-label">Año:</label>
+                        <select id="anio" name="anio" class="form-select" required>
+                            {% for year in years %}
+                            <option value="{{ year }}" {% if year == current_year %}selected{% endif %}>{{ year }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="row g-3 mt-2">
+                    <div class="col-md-4" id="selector-semana" style="display: none;">
+                        <label for="semana" class="form-label">Semana del Mes:</label>
+                        <select id="semana" name="semana" class="form-select">
+                            <option value="1">Semana 1</option>
+                            <option value="2">Semana 2</option>
+                            <option value="3">Semana 3</option>
+                            <option value="4">Semana 4</option>
+                            <option value="5">Semana 5</option>
+                        </select>
+                        <div class="form-text" id="semana-range">Selecciona una semana</div>
+                    </div>
+                    <div class="col-md-4" id="selector-quincena">
+                        <label for="quincena" class="form-label">Quincena:</label>
+                        <select id="quincena" name="quincena" class="form-select">
+                            <option value="1">Primera (1-15)</option>
+                            <option value="2">Segunda (16-Fin)</option>
+                        </select>
+                        <div class="form-text" id="quincena-range">Del 1 al 15</div>
+                    </div>
+                    <div class="col-md-8" id="selector-personalizado" style="display: none;">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="fecha_inicio" class="form-label">Fecha Inicio:</label>
+                                <input type="date" id="fecha_inicio" name="fecha_inicio" class="form-control">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="fecha_fin" class="form-label">Fecha Fin:</label>
+                                <input type="date" id="fecha_fin" name="fecha_fin" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Opciones de división para reportes -->
+                <div class="row mt-3" id="opciones-division">
+                    <div class="col-md-6">
+                        <label class="form-label">División del Reporte:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="dividir_semanas" id="dividir_semanas" checked>
+                            <label class="form-check-label" for="dividir_semanas">
+                                Dividir por semanas en reportes quincenales/mensuales
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" name="dividir_quincenas" id="dividir_quincenas" checked>
+                            <label class="form-check-label" for="dividir_quincenas">
+                                Dividir por quincenas en reportes mensuales
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="alert alert-info">
+                            <small>
+                                <i class="bi bi-info-circle"></i> 
+                                Los reportes se dividirán automáticamente mostrando totalizaciones 
+                                después de cada período (semana/quincena).
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="border p-3 rounded mb-4" style="background-color: #fefaf0;">
+                <h5 class="mb-3"><i class="bi bi-gear me-2"></i>2. Elige Formato y Filtros</h5>
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Formato del Archivo:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="formato" id="formato_excel" value="excel" checked>
+                            <label class="form-check-label" for="formato_excel">
+                                <i class="bi bi-file-earmark-excel me-1"></i>Excel Detallado
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="formato" id="formato_pdf" value="pdf">
+                            <label class="form-check-label" for="formato_pdf">
+                                <i class="bi bi-file-earmark-pdf me-1"></i>PDF Detallado
+                            </label>
+                        </div>
+                        <label class="form-label mt-3">Tipo de Datos:</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo_datos" id="tipo_datos_totales" value="totales" checked>
+                            <label class="form-check-label" for="tipo_datos_totales">
+                                Horas Totales
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="tipo_datos" id="tipo_datos_nocturnas" value="nocturnas">
+                            <label class="form-check-label" for="tipo_datos_nocturnas">
+                                Horas Nocturnas
+                            </label>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="id_empleado" class="form-label">Empleado Específico (Opcional):</label>
+                        <select name="id_empleado" id="id_empleado" class="form-select">
+                            <option value="">-- Todos los empleados --</option>
+                            {% for emp in empleados %}
+                            <option value="{{ emp.id_empleado }}">{{ emp.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Deja en blanco para incluir todos los empleados</div>
+                        
+                        <!-- Opciones avanzadas -->
+                        <div class="mt-3">
+                            <label class="form-label">Opciones Avanzadas:</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="incluir_observaciones" id="incluir_observaciones">
+                                <label class="form-check-label" for="incluir_observaciones">
+                                    Incluir observaciones en el reporte
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="agrupar_por_cargo" id="agrupar_por_cargo" checked>
+                                <label class="form-check-label" for="agrupar_por_cargo">
+                                    Agrupar empleados por cargo
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-4">
+                <button type="submit" class="btn btn-primary btn-lg" style="background: linear-gradient(135deg, #E30613 0%, #C4B49F 100%); border: none;">
+                    <i class="bi bi-download me-2"></i>Generar Reporte
+                </button>
+            </div>
+        </form>
+        
+        <!-- Información sobre los reportes -->
+        <div class="mt-4 p-3 rounded" style="background-color: #f8f9fc;">
+    <h5><i class="bi bi-info-circle me-2"></i>Información sobre los Reportes</h5>
+    <div class="row">
+        <div class="col-md-6">
+            <h6>Reportes Quincenales:</h6>
+            <ul>
+                <li><strong>Divididos por semana automáticamente</strong></li>
+                <li><strong>Columnas por semana: H.N, H.N.DOM, TOTAL</strong></li>
+                <li>Mismas totalizaciones que reporte mensual</li>
+                <li>Formato: HN (Horas Nocturnas), HNDOM (Horas Nocturnas Dominicales)</li>
+            </ul>
+        </div>
+        <div class="col-md-6">
+            <h6>Reportes Mensuales:</h6>
+            <ul>
+                <li><strong>Divididos por quincena automáticamente</strong></li>
+                <li><strong>Columnas por quincena: H.N, H.N.DOM, TOTAL</strong></li>
+                <li>Incluye resumen general del mes</li>
+                <li>Formato: HN (Horas Nocturnas), HNDOM (Horas Nocturnas Dominicales)</li>
+            </ul>
+        </div>
+    </div>
+    <div class="alert alert-success mt-2">
+        <small>
+            <i class="bi bi-check-circle"></i>
+            <strong>Nuevo Formato Implementado:</strong> 
+            Los reportes ahora incluyen las columnas específicas solicitadas: 
+            <strong>H.N</strong> (Horas Nocturnas), <strong>H.N.DOM</strong> (Horas Nocturnas Dominicales) 
+            y <strong>TOTAL</strong> por período.
+        </small>
+    </div>
+    <div class="alert alert-warning mt-2">
+        <small>
+            <i class="bi bi-exclamation-triangle"></i>
+            <strong>Nota:</strong> La lógica de horas nocturnas ha sido ajustada según lo solicitado. 
+            Ejemplo: Si hay 7h nocturnas totales (6 normales + 1 dominical), se mostrará como:
+            <strong>H.N = 6, H.N.DOM = 1, TOTAL = 7</strong>
+        </small>
+    </div>
+</div>
+</div>
+
+<script>
+function togglePeriodFields() {
+    const tipoPeriodo = document.getElementById('tipo_periodo').value;
+    const selectorSemana = document.getElementById('selector-semana');
+    const selectorQuincena = document.getElementById('selector-quincena');
+    const selectorPersonalizado = document.getElementById('selector-personalizado');
+    const opcionesDivision = document.getElementById('opciones-division');
+    
+    if (tipoPeriodo === 'semanal') {
+        selectorSemana.style.display = 'block';
+        selectorQuincena.style.display = 'none';
+        selectorPersonalizado.style.display = 'none';
+        opcionesDivision.style.display = 'none';
+        updateWeekRange();
+    } else if (tipoPeriodo === 'quincenal') {
+        selectorSemana.style.display = 'none';
+        selectorQuincena.style.display = 'block';
+        selectorPersonalizado.style.display = 'none';
+        opcionesDivision.style.display = 'block';
+        updateQuincenaRange();
+    } else if (tipoPeriodo === 'personalizado') {
+        selectorSemana.style.display = 'none';
+        selectorQuincena.style.display = 'none';
+        selectorPersonalizado.style.display = 'block';
+        opcionesDivision.style.display = 'none';
+    } else {
+        selectorSemana.style.display = 'none';
+        selectorQuincena.style.display = 'none';
+        selectorPersonalizado.style.display = 'none';
+        opcionesDivision.style.display = 'block';
+        document.getElementById('quincena-range').textContent = 'Todo el mes';
+    }
+}
+
+function updateWeekRange() {
+    const mes = parseInt(document.getElementById('mes').value);
+    const anio = parseInt(document.getElementById('anio').value);
+    const semana = parseInt(document.getElementById('semana').value);
+    
+    // Calcular lunes de la semana seleccionada
+    const firstDayOfMonth = new Date(anio, mes - 1, 1);
+    const firstDayOfWeek = firstDayOfMonth.getDay(); // 0 (domingo) a 6 (sábado)
+    
+    // Ajustar para que la semana empiece en lunes
+    let startDate = new Date(firstDayOfMonth);
+    if (firstDayOfWeek === 0) {
+        startDate.setDate(2); // Si el primer día es domingo, empezar el lunes 2
+    } else if (firstDayOfWeek > 1) {
+        startDate.setDate(2 - firstDayOfWeek);
+    }
+    
+    // Calcular inicio y fin de la semana seleccionada
+    startDate.setDate(startDate.getDate() + (semana - 1) * 7);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    
+    // Ajustar si el fin de semana se pasa del mes actual
+    if (endDate.getMonth() !== mes - 1) {
+        endDate.setDate(new Date(anio, mes, 0).getDate());
+    }
+    
+    // Ajustar si el inicio de semana es del mes anterior
+    if (startDate.getMonth() !== mes - 1) {
+        startDate.setDate(1);
+    }
+    
+    // Mostrar el rango de fechas
+    const options = { day: 'numeric', month: 'short' };
+    const startStr = startDate.toLocaleDateString('es-ES', options);
+    const endStr = endDate.toLocaleDateString('es-ES', options);
+    
+    document.getElementById('semana-range').textContent = `Del ${startStr} al ${endStr}`;
+}
+
+function updateQuincenaRange() {
+    const mes = parseInt(document.getElementById('mes').value);
+    const anio = parseInt(document.getElementById('anio').value);
+    const quincena = parseInt(document.getElementById('quincena').value);
+    
+    let startDay, endDay;
+    if (quincena === 1) {
+        startDay = 1;
+        endDay = 15;
+    } else {
+        startDay = 16;
+        endDay = new Date(anio, mes, 0).getDate(); // Último día del mes
+    }
+    
+    const options = { day: 'numeric', month: 'short' };
+    const startDate = new Date(anio, mes - 1, startDay);
+    const endDate = new Date(anio, mes - 1, endDay);
+    
+    const startStr = startDate.toLocaleDateString('es-ES', options);
+    const endStr = endDate.toLocaleDateString('es-ES', options);
+    
+    document.getElementById('quincena-range').textContent = `Del ${startStr} al ${endStr}`;
+}
+
+// Inicializar al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    togglePeriodFields();
+    
+    // Actualizar cuando cambien los selectores
+    document.getElementById('mes').addEventListener('change', function() {
+        if (document.getElementById('tipo_periodo').value === 'semanal') {
+            updateWeekRange();
+        } else if (document.getElementById('tipo_periodo').value === 'quincenal') {
+            updateQuincenaRange();
+        }
+    });
+    
+    document.getElementById('anio').addEventListener('change', function() {
+        if (document.getElementById('tipo_periodo').value === 'semanal') {
+            updateWeekRange();
+        } else if (document.getElementById('tipo_periodo').value === 'quincenal') {
+            updateQuincenaRange();
+        }
+    });
+    
+    document.getElementById('semana').addEventListener('change', updateWeekRange);
+    document.getElementById('quincena').addEventListener('change', updateQuincenaRange);
+    
+    // Validación del formulario
+    document.getElementById('reportForm').addEventListener('submit', function(e) {
+        const tipoPeriodo = document.getElementById('tipo_periodo').value;
+        let isValid = true;
+        
+        if (tipoPeriodo === 'semanal') {
+            const semana = document.getElementById('semana').value;
+            if (!semana) {
+                isValid = false;
+                alert('Por favor selecciona una semana');
+            }
+        } else if (tipoPeriodo === 'quincenal') {
+            const quincena = document.getElementById('quincena').value;
+            if (!quincena) {
+                isValid = false;
+                alert('Por favor selecciona una quincena');
+            }
+        } else if (tipoPeriodo === 'personalizado') {
+            const fechaInicio = document.getElementById('fecha_inicio').value;
+            const fechaFin = document.getElementById('fecha_fin').value;
+            if (!fechaInicio || !fechaFin) {
+                isValid = false;
+                alert('Por favor selecciona un rango de fechas');
+            }
+        }
+        
+        if (!isValid) {
+            e.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

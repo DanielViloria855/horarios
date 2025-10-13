@@ -1,0 +1,305 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">  <!-- Cambiado de col-md-8 a col-md-10 para hacerlo más ancho -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0"><i class="bi bi-pencil-square me-2"></i>Editando Turno</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-8">
+                        <p class="text-muted">
+                            Editando el turno de <strong>{{ turno.empleado.nombre }}</strong> 
+                            del día <strong>{{ turno.fecha.strftime('%d/%m/%Y') }}</strong>.
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-end">
+                        <span class="badge bg-info fs-6">
+                            Balance actual: {{ "%.2f"|format(turno.empleado.balance_horas) }}h
+                        </span>
+                    </div>
+                </div>
+                
+                <form action="{{ url_for('editar_turno', id=turno.id_turno) }}" method="POST" id="form-editar-turno">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="id_empleado" class="form-label">Empleado:</label>
+                            <select name="id_empleado" id="id_empleado" class="form-select" required>
+                                {% for empleado in empleados %}
+                                    <option value="{{ empleado.id_empleado }}" 
+                                            {% if empleado.id_empleado == turno.id_empleado %}selected{% endif %}
+                                            data-balance="{{ empleado.balance_horas }}">
+                                        {{ empleado.nombre }} 
+                                        (Balance: {{ "%.2f"|format(empleado.balance_horas) }}h)
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="fecha" class="form-label">Fecha del Turno:</label>
+                            <input type="date" name="fecha" id="fecha" class="form-control" 
+                                   value="{{ turno.fecha.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="hora_entrada" class="form-label">Hora de Entrada:</label>
+                            <input type="time" name="hora_entrada" id="hora_entrada" class="form-control" 
+                                   value="{{ turno.hora_entrada.strftime('%H:%M') }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="hora_salida" class="form-label">Hora de Salida:</label>
+                            <input type="time" name="hora_salida" id="hora_salida" class="form-control" 
+                                   value="{{ turno.hora_salida.strftime('%H:%M') }}" required>
+                        </div>
+                    </div>
+                    
+                    <!-- Información ampliada del turno -->
+                    <div class="alert alert-info mt-3">
+                        <h6><i class="bi bi-info-circle me-2"></i>Información Detallada del Turno</h6>
+                        <div class="row" id="info-turno-detallada">
+                            <div class="col-md-4">
+                                <p class="mb-1"><strong>Duración Total:</strong> <span id="duracion-total">-</span></p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="mb-1"><strong>Horas Normales:</strong> <span id="horas-normales">-</span></p>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="mb-1"><strong>Horas Nocturnas:</strong> <span id="horas-nocturnas">-</span></p>
+                            </div>
+                        </div>
+                        <div class="row mt-2">
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Balance del Día:</strong> <span id="balance-dia">-</span></p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Impacto en Bolsa:</strong> <span id="impacto-bolsa">-</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sección de balance acumulado -->
+                    <div class="alert alert-warning mt-3">
+                        <h6><i class="bi bi-clock-history me-2"></i>Balance Acumulado</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Balance Actual:</strong> 
+                                    <span id="balance-actual" class="badge 
+                                        {% if turno.empleado.balance_horas >= 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ "%.2f"|format(turno.empleado.balance_horas) }}h
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-1"><strong>Balance después del cambio:</strong> 
+                                    <span id="balance-futuro" class="badge bg-info">-</span>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="btn-ver-semanas">
+                                <i class="bi bi-search me-1"></i>Ver detalle por semanas
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                        <a href="{{ url_for('nuevo_turno') }}" class="btn btn-secondary me-md-2">
+                            <i class="bi bi-arrow-left me-1"></i>Cancelar
+                        </a>
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-check-circle me-1"></i>Guardar Cambios
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para ver detalle de semanas -->
+<div class="modal fade" id="modalSemanas" tabindex="-1" aria-labelledby="modalSemanasLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="modalSemanasLabel">
+                    <i class="bi bi-calendar-week me-2"></i>Detalle de Balance por Semanas
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="contenido-semanas">
+                    <p>Cargando información de semanas...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Calcular y mostrar información detallada del turno
+    function calcularTurnoDetallado() {
+        const entrada = document.getElementById('hora_entrada').value;
+        const salida = document.getElementById('hora_salida').value;
+        const empleadoSelect = document.getElementById('id_empleado');
+        const empleadoSeleccionado = empleadoSelect.options[empleadoSelect.selectedIndex];
+        const balanceActual = parseFloat(empleadoSeleccionado.dataset.balance);
+        
+        if (entrada && salida) {
+            const entradaTime = new Date(`1970-01-01T${entrada}`);
+            let salidaTime = new Date(`1970-01-01T${salida}`);
+            
+            if (salidaTime < entradaTime) {
+                salidaTime.setDate(salidaTime.getDate() + 1);
+            }
+            
+            const duracionHoras = (salidaTime - entradaTime) / 1000 / 3600;
+            const diferencia = duracionHoras - 8;
+            
+            // Calcular horas nocturnas aproximadas (simulación)
+            const entradaHora = parseInt(entrada.split(':')[0]);
+            const salidaHora = salidaTime.getHours();
+            let horasNocturnas = 0;
+            
+            // Horario nocturno: 21:00 a 6:00
+            if (entradaHora < 6 || entradaHora >= 21) {
+                horasNocturnas += Math.min(6 - (entradaHora < 6 ? entradaHora : 0), duracionHoras);
+            }
+            if (salidaHora > 21 || salidaHora < 6) {
+                horasNocturnas += Math.min(salidaHora < 6 ? salidaHora : 24 - 21, duracionHoras);
+            }
+            
+            const horasNormales = duracionHoras - horasNocturnas;
+            const balanceFuturo = balanceActual + diferencia;
+            
+            // Actualizar información detallada
+            document.getElementById('duracion-total').textContent = duracionHoras.toFixed(2) + ' horas';
+            document.getElementById('horas-normales').textContent = horasNormales.toFixed(2) + ' horas';
+            document.getElementById('horas-nocturnas').textContent = horasNocturnas.toFixed(2) + ' horas';
+            
+            if (diferencia > 0) {
+                document.getElementById('balance-dia').innerHTML = 
+                    `<span class="text-success">+${diferencia.toFixed(2)} horas (extra)</span>`;
+                document.getElementById('impacto-bolsa').innerHTML = 
+                    `<span class="text-success">+${diferencia.toFixed(2)}h a la bolsa</span>`;
+            } else if (diferencia < 0) {
+                document.getElementById('balance-dia').innerHTML = 
+                    `<span class="text-danger">${diferencia.toFixed(2)} horas (faltantes)</span>`;
+                document.getElementById('impacto-bolsa').innerHTML = 
+                    `<span class="text-danger">${diferencia.toFixed(2)}h de la bolsa</span>`;
+            } else {
+                document.getElementById('balance-dia').innerHTML = 
+                    `<span class="text-info">0 horas (completo)</span>`;
+                document.getElementById('impacto-bolsa').innerHTML = 
+                    `<span class="text-info">Sin cambios en la bolsa</span>`;
+            }
+            
+            // Actualizar balance futuro
+            const balanceFuturoElement = document.getElementById('balance-futuro');
+            balanceFuturoElement.textContent = balanceFuturo.toFixed(2) + 'h';
+            balanceFuturoElement.className = 'badge ' + (balanceFuturo >= 0 ? 'bg-success' : 'bg-danger');
+        }
+    }
+    
+    // Event listeners para calcular el turno
+    document.getElementById('hora_entrada').addEventListener('change', calcularTurnoDetallado);
+    document.getElementById('hora_salida').addEventListener('change', calcularTurnoDetallado);
+    document.getElementById('id_empleado').addEventListener('change', calcularTurnoDetallado);
+    
+    // Cargar detalle de semanas
+    document.getElementById('btn-ver-semanas').addEventListener('click', function() {
+        const empleadoId = document.getElementById('id_empleado').value;
+        cargarDetalleSemanas(empleadoId);
+    });
+    
+    function cargarDetalleSemanas(empleadoId) {
+        fetch(`/api/empleado/${empleadoId}/semanas_balance`)
+            .then(response => response.json())
+            .then(data => {
+                let contenido = `
+                    <h6>Historial de Balance por Semanas - ${data.nombre_empleado}</h6>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Semana</th>
+                                    <th>Fecha Inicio</th>
+                                    <th>Fecha Fin</th>
+                                    <th>Horas Trabajadas</th>
+                                    <th>Horas Esperadas</th>
+                                    <th>Balance Semanal</th>
+                                    <th>Acumulado</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                if (data.semanas && data.semanas.length > 0) {
+                    data.semanas.forEach(semana => {
+                        contenido += `
+                            <tr>
+                                <td>Semana ${semana.numero_semana}</td>
+                                <td>${semana.fecha_inicio}</td>
+                                <td>${semana.fecha_fin}</td>
+                                <td>${semana.horas_trabajadas.toFixed(2)}</td>
+                                <td>${semana.horas_esperadas.toFixed(2)}</td>
+                                <td class="${semana.balance_semanal >= 0 ? 'text-success' : 'text-danger'}">
+                                    ${semana.balance_semanal >= 0 ? '+' : ''}${semana.balance_semanal.toFixed(2)}h
+                                </td>
+                                <td class="${semana.acumulado >= 0 ? 'text-success' : 'text-danger'}">
+                                    ${semana.acumulado >= 0 ? '+' : ''}${semana.acumulado.toFixed(2)}h
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    contenido += `
+                        <tr>
+                            <td colspan="7" class="text-center text-muted">
+                                No hay datos de semanas disponibles
+                            </td>
+                        </tr>
+                    `;
+                }
+                
+                contenido += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-3 p-3 bg-light rounded">
+                        <h6>Resumen del Balance</h6>
+                        <p><strong>Balance Total Acumulado:</strong> 
+                            <span class="${data.balance_total >= 0 ? 'text-success' : 'text-danger'}">
+                                ${data.balance_total >= 0 ? '+' : ''}${data.balance_total.toFixed(2)} horas
+                            </span>
+                        </p>
+                        <p><strong>Semanas con balance positivo:</strong> ${data.semanas_positivas}</p>
+                        <p><strong>Semanas con balance negativo:</strong> ${data.semanas_negativas}</p>
+                    </div>
+                `;
+                
+                document.getElementById('contenido-semanas').innerHTML = contenido;
+                
+                // Mostrar el modal
+                const modal = new bootstrap.Modal(document.getElementById('modalSemanas'));
+                modal.show();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('contenido-semanas').innerHTML = `
+                    <div class="alert alert-danger">
+                        Error al cargar los datos de semanas: ${error.message}
+                    </div>
+                `;
+            });
+    }
+    
+    // Calcular al cargar la página
+    calcularTurnoDetallado();
+});
+</script>
+{% endblock %}

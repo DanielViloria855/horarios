@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-7">
+        <div class="card shadow-sm">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">✏️ Editando a: {{ empleado.nombre }}</h4>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('editar_empleado', id=empleado.id_empleado) }}" method="POST">
+                    
+                    <div class="mb-3">
+                        <label for="nombre" class="form-label">Nombre Completo:</label>
+                        <input type="text" name="nombre" id="nombre" class="form-control" value="{{ empleado.nombre }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="documento" class="form-label">Número de Documento:</label>
+                        <input type="text" name="documento" id="documento" class="form-control" value="{{ empleado.documento }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="cargo" class="form-label">Cargo:</label>
+                        <input type="text" name="cargo" id="cargo" class="form-control" value="{{ empleado.cargo }}" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="fecha_ingreso" class="form-label">Fecha de Ingreso:</label>
+                            <input type="date" name="fecha_ingreso" id="fecha_ingreso" class="form-control" value="{{ empleado.fecha_ingreso.strftime('%Y-%m-%d') }}" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="estado" class="form-label">Estado:</label>
+                            <select name="estado" id="estado" class="form-select" required>
+                                <option value="Activo" {% if empleado.estado == 'Activo' %}selected{% endif %}>Activo</option>
+                                <option value="Inactivo" {% if empleado.estado == 'Inactivo' %}selected{% endif %}>Inactivo</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                         <button type="submit" class="btn btn-warning">Guardar Cambios</button>
+                         <a href="{{ url_for('listar_empleados') }}" class="btn btn-secondary">Cancelar</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

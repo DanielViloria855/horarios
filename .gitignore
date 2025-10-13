@@ -1,0 +1,36 @@
+# 🧠 Entorno virtual
+venv/
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 📦 Archivos de dependencias y paquetes
+*.egg-info/
+*.egg
+*.whl
+
+# 💻 Archivos de sistema (Windows / macOS / VS Code)
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# 🧰 Configuración local
+*.log
+instance/
+.env.*
+.env.local
+*.bak
+
+# 📊 Archivos temporales o de caché
+*.sqlite3
+*.db
+*.tmp
+
+# 🚀 Archivos específicos de despliegue o build
+build/
+dist/
+
+# 🧩 Archivos de
