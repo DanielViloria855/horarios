@@ -224,7 +224,7 @@
                         <tbody>
                         {% for empleado in empleados %}
                             {% set turno = turnos_existentes.get(empleado.id_empleado) %}
-                            <tr class="fila-empleado" data-id-empleado="{{ empleado.id_empleado }}" data-horas-semana="{{ empleado.horas_semana_actual }}">
+                            <tr class="fila-empleado" data-id-empleado="{{ empleado.id_empleado }}" data-horas-semana="{{ empleado.horas_semana_actual }}" data-balance-acumulado="{{ empleado.balance_acumulado }}">
                                 <td>
                                     <div class="d-flex justify-content-between align-items-center">
                                         <span>{{ empleado.nombre }}</span>
@@ -234,18 +234,28 @@
                                     <div class="balance-container mt-2">
                                         <div class="balance-item">
                                             <span class="balance-icon bg-success text-white"><i class="bi bi-calendar-week"></i></span>
-                                            <span class="balance-label">Semana:</span>
-                                            <span class="balance-value {% if empleado.horas_semana_actual >= 44 %}text-success{% else %}text-warning{% endif %}">
-                                                {{ "%.1f"|format(empleado.horas_semana_actual) }}/44h
+                                            <span class="balance-label">Horas semana (antes):</span>
+                                            <span class="balance-value" id="horas-semana-{{ empleado.id_empleado }}">
+                                                {{ "%.2f"|format(empleado.horas_semana_actual) }}h
                                             </span>
+                                        </div>
+                                        <div class="balance-item">
+                                            <span class="balance-icon bg-secondary text-white"><i class="bi bi-flag"></i></span>
+                                            <span class="balance-label">Esperadas:</span>
+                                            <span class="balance-value" id="horas-esperadas-{{ empleado.id_empleado }}">44.00h</span>
+                                        </div>
+                                        <div class="balance-item">
+                                            <span class="balance-icon bg-info text-white"><i class="bi bi-clock"></i></span>
+                                            <span class="balance-label">Horas día:</span>
+                                            <span class="balance-value" id="hora-dia-{{ empleado.id_empleado }}">—</span>
                                         </div>
                                         <div class="balance-item">
                                             <span class="balance-icon {% if empleado.balance_semanal >= 0 %}bg-info{% else %}bg-danger{% endif %} text-white">
                                                 <i class="bi {% if empleado.balance_semanal >= 0 %}bi-plus-circle{% else %}bi-dash-circle{% endif %}"></i>
                                             </span>
                                             <span class="balance-label">Balance Sem:</span>
-                                            <span class="balance-value {% if empleado.balance_semanal >= 0 %}text-info{% else %}text-danger{% endif %}">
-                                                {{ "%+.1f"|format(empleado.balance_semanal) }}h
+                                            <span class="balance-value {% if empleado.balance_semanal >= 0 %}text-info{% else %}text-danger{% endif %}" id="balance-semanal-{{ empleado.id_empleado }}">
+                                                {{ "%+.2f"|format(empleado.balance_semanal) }}h
                                             </span>
                                         </div>
                                         <div class="balance-item">
@@ -253,8 +263,8 @@
                                                 <i class="bi bi-clock-history"></i>
                                             </span>
                                             <span class="balance-label">Acumulado:</span>
-                                            <span class="balance-value {% if empleado.balance_acumulado >= 0 %}text-primary{% else %}text-warning{% endif %}">
-                                                {{ "%+.1f"|format(empleado.balance_acumulado) }}h
+                                            <span class="balance-value {% if empleado.balance_acumulado >= 0 %}text-primary{% else %}text-warning{% endif %}" id="acumulado-{{ empleado.id_empleado }}">
+                                                {{ "%+.2f"|format(empleado.balance_acumulado) }}h
                                             </span>
                                         </div>
                                     </div>
@@ -582,97 +592,102 @@ document.addEventListener('DOMContentLoaded', function() {
     const filas = document.querySelectorAll('.fila-empleado');
 
     async function actualizarEstatus(fila) {
+        // Lee referencias del DOM para esta fila
+        const empleadoId = fila.dataset.idEmpleado;
         const entradaInput = fila.querySelector('input[name^="entrada_"]');
         const salidaInput = fila.querySelector('input[name^="salida_"]');
         const mensajeDiv = fila.querySelector('.estatus-turno-interactivo');
-        const compensacionDiv = fila.querySelector('.compensacion-horas');
-        const empleadoId = fila.dataset.idEmpleado;
-        const horasSemanaActual = parseFloat(fila.dataset.horasSemana) || 0;
+        const compensacionDiv = document.getElementById(`compensacion-${empleadoId}`) || fila.querySelector('.compensacion-horas');
         const obsSelect = fila.querySelector('.obs-select');
 
-        // Limpiar el mensaje anterior
-        mensajeDiv.innerHTML = '';
-        compensacionDiv.style.display = 'none';
+        // Datos base de la semana/empleado
+        const horasSemanaAntes = parseFloat(fila.dataset.horasSemana) || 0.0;
+        const balanceAcumuladoServidor = parseFloat(fila.dataset.balanceAcumulado);
+        const HORAS_ESPERADAS_SEMANA = 44.0; // Regla: 44 horas por semana
 
-        // Si hay una observación seleccionada, no calcular horas
+        // Elementos a actualizar
+        const horasSemanaEl = document.getElementById(`horas-semana-${empleadoId}`);
+        const horasEsperadasEl = document.getElementById(`horas-esperadas-${empleadoId}`);
+        const horasDiaEl = document.getElementById(`hora-dia-${empleadoId}`);
+        const balanceSemanalEl = document.getElementById(`balance-semanal-${empleadoId}`);
+        const acumuladoEl = document.getElementById(`acumulado-${empleadoId}`);
+
+        // Refresca placeholders fijos
+        if (horasSemanaEl) horasSemanaEl.textContent = `${horasSemanaAntes.toFixed(2)}h`;
+        if (horasEsperadasEl) horasEsperadasEl.textContent = `${HORAS_ESPERADAS_SEMANA.toFixed(2)}h`;
+
+        // Limpia mensajes dinámicos
+        mensajeDiv.innerHTML = '';
+
+        // Si hay una observación seleccionada, no calcular horas ni mostrar compensación
         if (obsSelect && obsSelect.value !== '') {
+            if (compensacionDiv) compensacionDiv.style.display = 'none';
+            if (horasDiaEl) horasDiaEl.textContent = '—';
             return;
         }
 
-        if (!entradaInput.value || !salidaInput.value) return;
-
-        try {
+        // Calcula horas del día si hay entrada/salida y NO hay observación
+        let horasDia = null;
+        const hayObs = obsSelect && obsSelect.value !== '';
+        if (!hayObs && entradaInput && salidaInput && entradaInput.value && salidaInput.value) {
             const entrada = new Date(`1970-01-01T${entradaInput.value}`);
             let salida = new Date(`1970-01-01T${salidaInput.value}`);
-            
-            // Si la salida es anterior a la entrada, asumimos que es del día siguiente
+            // Si salida < entrada asumimos que la salida es al día siguiente
             if (salida < entrada) {
                 salida.setDate(salida.getDate() + 1);
             }
-            
-            const duracionHoras = (salida - entrada) / 1000 / 3600;
+            horasDia = (salida - entrada) / 3600000;
+        }
 
-            // Obtener el balance actual del empleado
-            const response = await fetch(`/api/empleado/${empleadoId}/balance`);
-            const data = await response.json();
-            const balance = parseFloat(data.balance);
-            
-            let html = '';
-            const diferencia = duracionHoras - 8;
-            const horasEsperadasSemana = 44; // 44 horas semanales
-            const balanceSemanal = horasSemanaActual + duracionHoras - horasEsperadasSemana;
+        // Actualiza "Horas día"
+        if (horasDiaEl) {
+            horasDiaEl.textContent = horasDia !== null ? `${horasDia.toFixed(2)}h` : '—';
+        }
 
-            // Siempre mostrar las horas del día y el balance semanal
-            if (diferencia > 0) {
-                html += `<div class="alert alert-info py-1 px-2 small mb-1">
+        // Calcula balance semanal provisional cuando haya horas del día
+        if (horasDia !== null) {
+            // Fórmula: balanceProvisional = horasSemanaAntes + horasDia - 44.0
+            const balanceProvisional = horasSemanaAntes + horasDia - HORAS_ESPERADAS_SEMANA;
+            const balanceProvisionalTxt = `${balanceProvisional >= 0 ? '+' : ''}${balanceProvisional.toFixed(2)}h`;
+            if (balanceSemanalEl) balanceSemanalEl.textContent = balanceProvisionalTxt;
+
+            // Mensajes informativos según el caso
+            const tipo = balanceProvisional >= 0 ? 'success' : 'warning';
+            const html = `
+                <div class="alert alert-info py-1 px-2 small mb-1">
                     <i class="bi bi-info-circle me-1"></i>
-                    <strong>${duracionHoras.toFixed(2)}h</strong> este día 
-                    (<strong>+${diferencia.toFixed(2)}h</strong> extra)
-                </div>`;
-            } else if (diferencia < 0) {
-                html += `<div class="alert alert-warning py-1 px-2 small mb-1">
-                    <i class="bi bi-info-circle me-1"></i>
-                    <strong>${duracionHoras.toFixed(2)}h</strong> este día 
-                    (<strong>${diferencia.toFixed(2)}h</strong> por debajo)
-                </div>`;
-            } else {
-                html += `<div class="alert alert-success py-1 px-2 small mb-1">
-                    <i class="bi bi-info-circle me-1"></i>
-                    <strong>${duracionHoras.toFixed(2)}h</strong> este día 
-                    (turno completo)
-                </div>`;
-            }
-            
-            // Mostrar balance semanal
-            html += `<div class="alert alert-secondary py-1 px-2 small">
-                <i class="bi bi-calendar-week me-1"></i>
-                Balance semanal: <strong>${balanceSemanal.toFixed(2)}h</strong>
-            </div>`;
-            
-            // Mostrar sección de compensación solo si se han completado las horas semanales
-            if (horasSemanaActual + duracionHoras >= horasEsperadasSemana) {
-                compensacionDiv.style.display = 'block';
-                
-                // Si hay horas extra, ofrecer cobrar
-                if (diferencia > 0) {
-                    html += `<div class="alert alert-success py-1 px-2 small mt-1">
-                        <i class="bi bi-plus-circle me-1"></i>
-                        <strong>+${diferencia.toFixed(2)}h</strong> disponibles para la bolsa
-                    </div>`;
-                }
-                // Si faltan horas, ofrecer pagar con balance (solo si hay saldo positivo)
-                else if (diferencia < 0 && balance > 0) {
-                    html += `<div class="alert alert-warning py-1 px-2 small mt-1">
-                        <i class="bi bi-dash-circle me-1"></i>
-                        Puede usar hasta <strong>${Math.min(Math.abs(diferencia), balance).toFixed(2)}h</strong> de su bolsa
-                    </div>`;
-                }
-            }
-            
+                    Horas día: <strong>${horasDia.toFixed(2)}h</strong>
+                </div>
+                <div class="alert alert-${tipo} py-1 px-2 small">
+                    <i class="bi bi-calendar-week me-1"></i>
+                    Balance semanal provisional: <strong>${balanceProvisionalTxt}</strong>
+                </div>
+            `;
             mensajeDiv.innerHTML = html;
-            
-        } catch (error) {
-            console.error("Error al obtener balance:", error);
+        }
+
+        // Regla de mostrar/ocultar compensación
+        // Muestra si: horasSemanaAntes >= 44  OR  horasSemanaAntes + horasDia >= 44
+        const cumpleComp = (horasSemanaAntes >= HORAS_ESPERADAS_SEMANA) ||
+                           (horasDia !== null && (horasSemanaAntes + horasDia >= HORAS_ESPERADAS_SEMANA));
+        if (compensacionDiv) {
+            compensacionDiv.style.display = cumpleComp ? 'block' : 'none';
+        }
+
+        // Actualiza "Acumulado" usando API con fallback a valor del servidor
+        let acumuladoValor = isNaN(balanceAcumuladoServidor) ? 0 : balanceAcumuladoServidor;
+        try {
+            const resp = await fetch(`/api/empleado/${empleadoId}/balance`);
+            if (resp.ok) {
+                const data = await resp.json();
+                const balanceApi = parseFloat(data.balance);
+                if (!isNaN(balanceApi)) acumuladoValor = balanceApi;
+            }
+        } catch (e) {
+            // No mostrar errores en UI; se usa fallback del servidor
+        }
+        if (acumuladoEl) {
+            acumuladoEl.textContent = `${acumuladoValor >= 0 ? '+' : ''}${acumuladoValor.toFixed(2)}h`;
         }
     }
 
